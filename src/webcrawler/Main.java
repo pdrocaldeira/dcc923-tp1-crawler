@@ -5,16 +5,17 @@ import com.chilkatsoft.CkSpider;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.Iterator;	
 import java.util.Comparator;
 import java.util.HashSet;
 
 public class Main {
 	
-	private static final int MAX_SIMULTANEOUS_CRAWLERS = 30; //600 crashed my computer (CAREFUL)
+	public static final int MAX_SIMULTANEOUS_CRAWLERS = 8; //600 crashed my computer (CAREFUL)
 	private static final int MAX_SIZE_RECENT_DOMAINS = 1000;
 	private static final long START_TIME = System.currentTimeMillis();
-	public static int PAGES_CRAWLED = 0;
+	public static AtomicLong PAGES_CRAWLED = new AtomicLong();
 	public static int CRAWLERS_SLEEPING = 0;
 	public static int PAGES_REQUEST = 0;
 	public static int CRAWLERS_KILLED = 0;
@@ -22,7 +23,7 @@ public class Main {
 	private final static boolean DEBUG_BANDWIDTH = false;
 	public final static boolean DEBUG_ADD_OUTBOUND_LINK = false;
 	public final static boolean DEBUG_EMPTY_PAGE = false;
-	private final static boolean DEBUG_GLOBAL_QUEUE_SIZE = false;
+	private final static boolean DEBUG_GLOBAL_QUEUE_SIZE = true;
 	private final static boolean DEBUG_NUMBER_OF_CRAWLERS = false;
 	private final static boolean DEBUG_PAGES_CRAWLED_PER_SECOND = true;
 	private final static boolean DEBUG_PAGES_CRAWLED = false;
@@ -61,77 +62,41 @@ public class Main {
 	
 	// Instantiate a Chilkat object and print it's version.
 	public static void main(String argv[]){
-		LinkedList<DomainCrawler> crawlers = new LinkedList<DomainCrawler>();
-		
 		long last_debug_time = System.currentTimeMillis();
 		
-		DomainCrawler seed = new DomainCrawler("https://en.wikipedia.org/wiki/Main_Page");
+		LinkedList<WorkerCrawler> crawlers = new LinkedList<WorkerCrawler>();
+		WorkerCrawler crawler;
 		
-		DomainCrawler newCrawler, crawler2Die;		
+		GLOBAL_QUEUE.add("http://allrecipes.com.br/");												
+				
+		recentDomainList.addLast(WorkerCrawler.getDomainFromURL("http://allrecipes.com.br/"));
 		
-		crawlers.add(seed);
-		recentDomainList.addLast(seed.domain);		
-		
-		seed.start();
-		
-		while(seed.getRuns() == 0){
-			System.out.println("DEBUG: Waiting seed to complete");
-		}; //Busy Waiting first batch of URLs
-		
+		for(int i = 0; i < MAX_SIMULTANEOUS_CRAWLERS; i++){
+			crawler = new WorkerCrawler();
+			crawlers.add(crawler);
+			crawler.start();
+		}
+						
 		double allBandwidth;		
 		
 		try{
 			
 		
-		do{
-			allBandwidth = 0;
-			
-			
-			Iterator<DomainCrawler> crawlerIterator = crawlers.iterator();
-			DomainCrawler auxCrawler;
-			while(crawlerIterator.hasNext()){
-				auxCrawler = crawlerIterator.next();
-				if(auxCrawler.isAlive()) {
-					allBandwidth += auxCrawler.getBandwidth();					
-				}
-				else {					
-					crawlerIterator.remove();				
-				}
-			}			
-			
-			if(DEBUG_BANDWIDTH) System.out.println("DEBUG: Bandwidth is "+allBandwidth);
-			if(GLOBAL_QUEUE.isEmpty() == false){
+			do{				
 				
-				if( (allBandwidth > 1000000/8 || crawlers.size() >= MAX_SIMULTANEOUS_CRAWLERS) && GLOBAL_QUEUE.size() > 1){					
-					crawler2Die = crawlers.removeFirst();
-					crawler2Die.kill();
-					crawler2Die.interrupt();
-					CRAWLERS_KILLED++;					
-				}
-				
-				if(crawlers.size() < MAX_SIMULTANEOUS_CRAWLERS){
-					newCrawler = new DomainCrawler(GLOBAL_QUEUE.poll());
-					crawlers.add(newCrawler);
-					recentDomainList.addLast(newCrawler.domain);
-					newCrawler.start();
-				}								
-				
-				if(System.currentTimeMillis() - last_debug_time > 30000){
-					last_debug_time = System.currentTimeMillis();
+				Thread.sleep(200);
 					if(DEBUG_GLOBAL_QUEUE_SIZE) System.out.println("DEBUG: GLOBAL QUEUE size: "+GLOBAL_QUEUE.size());
 					if(DEBUG_NUMBER_OF_CRAWLERS) System.out.println("DEBUG: There are "+crawlers.size()+" threads");
-					if(DEBUG_PAGES_CRAWLED_PER_SECOND) System.out.println("DEBUG: Pages Crawled per second: "+((double)PAGES_CRAWLED*1000)/(System.currentTimeMillis() - START_TIME));
-					if(DEBUG_PAGES_CRAWLED) System.out.println("DEBUG: Pages Crawled: "+PAGES_CRAWLED);
+					if(DEBUG_PAGES_CRAWLED_PER_SECOND) System.out.println("DEBUG: Pages Crawled per second: "+((double)PAGES_CRAWLED.get()*1000)/(System.currentTimeMillis() - START_TIME));
+					if(DEBUG_PAGES_CRAWLED) System.out.println("DEBUG: Pages Crawled: "+PAGES_CRAWLED.get());
 					if(DEBUG_CRAWLERS_SLEEPING) System.out.println("DEBUG: Sleeping Crawlers "+CRAWLERS_SLEEPING);
 					if(DEBUG_PAGES_REQUEST_PER_SECOND) System.out.println("DEBUG: Pages Requested per second: "+((double)PAGES_REQUEST*1000)/(System.currentTimeMillis() - START_TIME));
 					if(DEBUG_CRAWLERS_KILLED) System.out.println("DEBUG: Crawlers Killed: "+CRAWLERS_KILLED);
-				}
-			}
+				
 			
-		
-							
-			
-		}while(!crawlers.isEmpty() || !GLOBAL_QUEUE.isEmpty() || CRAWLERS_SLEEPING > 0);
+								
+				
+			}while(!crawlers.isEmpty() || !GLOBAL_QUEUE.isEmpty() || CRAWLERS_SLEEPING > 0);
 		}catch(Exception e){
 			e.printStackTrace();
 		}

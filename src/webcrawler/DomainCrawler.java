@@ -69,7 +69,7 @@ public class DomainCrawler extends Thread {
 			
 			if(spider.lastHtml().length() > 0) {
 				
-				Main.PAGES_CRAWLED++;
+				Main.PAGES_CRAWLED.incrementAndGet();
 			}
 			if(spider.get_NumUnspidered() == 0) this.kill = true;
 			else{
