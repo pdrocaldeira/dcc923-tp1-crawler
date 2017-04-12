@@ -12,8 +12,8 @@ import java.util.HashSet;
 
 public class Main {
 	
-	public static final int MAX_SIMULTANEOUS_CRAWLERS = 8; //600 crashed my computer (CAREFUL)
-	private static final int MAX_SIZE_RECENT_DOMAINS = 1000;
+	public static final int MAX_SIMULTANEOUS_CRAWLERS = 32;//600 crashed my computer (CAREFUL)
+	private static final int MAX_SIZE_RECENT_DOMAINS = 100000;
 	private static final long START_TIME = System.currentTimeMillis();
 	public static AtomicLong PAGES_CRAWLED = new AtomicLong();
 	public static int CRAWLERS_SLEEPING = 0;
@@ -37,13 +37,20 @@ public class Main {
 	//TODO: Should have relative max size based on max memory of host machine
 	//See this for reference: http://stackoverflow.com/questions/12807797/java-get-available-memory
 	public static PriorityBlockingQueue<String> GLOBAL_QUEUE = new PriorityBlockingQueue<String>(100000000, new Comparator<String>(){
-		public int compare(String url1, String url2){
-			if(recentDomainList.contains(DomainCrawler.getDomainFromURL(url1))){
+		public int compare(String url1, String url2){						
+			
+			int count_bad_characters1 = url1.length() - url1.replace("/", "").replace("=","").replace("&","").replace(":","").replace(";","").replace("%","").length();
+			int count_bad_characters2 = url2.length() - url2.replace("/", "").replace("=","").replace("&","").replace(":","").replace(";","").replace("%","").length();
+			
+			return count_bad_characters1 - count_bad_characters2; //they both aren't recent domains
+			
+/*			if(recentDomainList.contains(DomainCrawler.getDomainFromURL(url1))){
 				if(recentDomainList.contains(DomainCrawler.getDomainFromURL(url2))) return 0; //they both are recent domains
 				else return 1; //URL2 have priority because it isn't in recent domain
 			}
-			else if(recentDomainList.contains(DomainCrawler.getDomainFromURL(url2))) return -1; //URL1 have priority because it isn't in recent domain
-			return 0; //they both aren't recent domains
+			else if(recentDomainList.contains(DomainCrawler.getDomainFromURL(url2))) return -1; //URL1 have priority because it isn't in recent domain*/
+			
+			
 		}
 	}); //different domains queue		
 	
